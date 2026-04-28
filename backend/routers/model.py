@@ -10,13 +10,14 @@ from models.schemas import (
     LoadModelRequest,
     LoadModelResponse,
     ModelStatusResponse,
+    ModelListResponse,
     BaseResponse,
 )
 
 router = APIRouter(prefix="/api/models", tags=["模型管理"])
 
 
-@router.get("", response_model=BaseResponse)
+@router.get("", response_model=ModelListResponse)
 async def get_available_models():
     """
     获取可用模型列表
@@ -65,12 +66,13 @@ async def load_model(request: LoadModelRequest):
         return {
             "success": True,
             "message": result["message"],
-            "model_info": result["model_info"],
+            "model_info": result.get("model_info"),
         }
     else:
         return {
             "success": False,
             "message": result.get("error", "加载失败"),
+            "model_info": None,
         }
 
 

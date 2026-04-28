@@ -77,6 +77,16 @@ export interface FilePreview {
   tail: Record<string, any>[];
 }
 
+export interface PaginationInfo {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  total_pages: number;
+  has_prev: boolean;
+  has_next: boolean;
+  data: Record<string, any>[];
+}
+
 // ============ 预测相关类型 ============
 
 export interface PredictionParams {
@@ -135,6 +145,7 @@ export interface TaskStatus {
 export interface TaskResult {
   task_id: string;
   status: string;
+  progress?: number;
   result?: {
     predictions: PredictionPoint[];
     chart_config: Record<string, any>;
@@ -142,6 +153,7 @@ export interface TaskResult {
   };
   error?: string;
   execution_time?: number;
+  message?: string;
 }
 
 export interface PredictionHistoryItem {

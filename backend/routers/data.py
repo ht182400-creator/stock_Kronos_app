@@ -77,18 +77,44 @@ async def list_files():
     Returns:
         文件列表
     """
+    import pandas as pd
+    
     files = []
     for file_id, file_path in _data_files.items():
         if not os.path.exists(file_path):
             continue
         
         stat = os.stat(file_path)
-        files.append({
+        file_info = {
             "file_id": file_id,
             "file_name": os.path.basename(file_path),
             "size": stat.st_size,
             "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-        })
+        }
+        
+        # 尝试读取文件获取更多元数据
+        try:
+            df = pd.read_csv(file_path)
+            file_info["rows"] = len(df)
+            file_info["columns"] = list(df.columns)
+            
+            # 尝试获取时间范围
+            timestamp_col = None
+            for col in ["timestamps", "timestamp", "date", "time"]:
+                if col in df.columns:
+                    timestamp_col = col
+                    break
+            
+            if timestamp_col:
+                timestamps = pd.to_datetime(df[timestamp_col])
+                file_info["time_range"] = {
+                    "start": timestamps.min().isoformat(),
+                    "end": timestamps.max().isoformat(),
+                }
+        except Exception:
+            pass
+        
+        files.append(file_info)
     
     return {
         "success": True,
@@ -148,12 +174,18 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @router.get("/{file_id}")
-async def get_file_info(file_id: str):
+async def get_file_info(
+    file_id: str,
+    page: int = 1,
+    page_size: int = 5
+):
     """
-    获取文件详情
+    获取文件详情（支持分页）
     
     Args:
         file_id: 文件ID
+        page: 页码（从1开始）
+        page_size: 每页条数
     
     Returns:
         文件信息
@@ -165,13 +197,32 @@ async def get_file_info(file_id: str):
     import pandas as pd
     
     df = pd.read_csv(file_path)
-    df["timestamps"] = pd.to_datetime(df["timestamps"])
+    
+    # 检测并转换时间戳列
+    timestamp_col = None
+    for col in ["timestamps", "timestamp", "date", "time"]:
+        if col in df.columns:
+            timestamp_col = col
+            break
+    
+    if timestamp_col:
+        df["timestamps"] = pd.to_datetime(df[timestamp_col])
+    else:
+        raise HTTPException(status_code=400, detail="未找到时间戳列")
+    
+    total_rows = len(df)
+    total_pages = (total_rows + page_size - 1) // page_size  # 向上取整
+    
+    # 计算分页数据
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    page_data = df.iloc[start_idx:end_idx]
     
     return {
         "success": True,
         "file_id": file_id,
         "file_name": os.path.basename(file_path),
-        "rows": len(df),
+        "rows": total_rows,
         "columns": list(df.columns),
         "time_range": {
             "start": df["timestamps"].min().isoformat(),
@@ -180,6 +231,16 @@ async def get_file_info(file_id: str):
         "preview": {
             "head": df.head(5).to_dict(orient="records"),
             "tail": df.tail(5).to_dict(orient="records"),
+        },
+        # 分页信息
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_rows": total_rows,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+            "data": page_data.to_dict(orient="records"),
         },
     }
 
@@ -203,7 +264,18 @@ async def get_file_data(file_id: str, rows: int = 0):
     import pandas as pd
     
     df = pd.read_csv(file_path)
-    df["timestamps"] = pd.to_datetime(df["timestamps"])
+    
+    # 检测并转换时间戳列
+    timestamp_col = None
+    for col in ["timestamps", "timestamp", "date", "time"]:
+        if col in df.columns:
+            timestamp_col = col
+            break
+    
+    if timestamp_col:
+        df["timestamps"] = pd.to_datetime(df[timestamp_col])
+    else:
+        raise HTTPException(status_code=400, detail="未找到时间戳列")
     
     if rows > 0:
         df = df.tail(rows)
@@ -251,5 +323,19 @@ def get_file_dataframe(file_id: str) -> "pd.DataFrame":
         raise ValueError(f"文件不存在: {file_id}")
     
     df = pd.read_csv(file_path)
-    df["timestamps"] = pd.to_datetime(df["timestamps"])
+    print(f"[DEBUG] get_file_dataframe: file_id={file_id}, 原始列={list(df.columns)}")
+    
+    # 检测并转换时间戳列
+    timestamp_col = None
+    for col in ["timestamps", "timestamp", "date", "time"]:
+        if col in df.columns:
+            timestamp_col = col
+            break
+    
+    if timestamp_col:
+        df["timestamps"] = pd.to_datetime(df[timestamp_col])
+        print(f"[DEBUG] get_file_dataframe: 转换后列={list(df.columns)}")
+    else:
+        raise ValueError(f"文件 {file_id} 中未找到时间戳列")
+    
     return df

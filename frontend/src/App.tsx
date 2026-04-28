@@ -94,19 +94,36 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // 选择文件（获取完整信息）
+  const handleSelectFile = useCallback(async (file: DataFileInfo | null) => {
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+    try {
+      const fileInfo = await dataApi.getFileInfo(file.file_id);
+      setSelectedFile({ ...file, ...fileInfo });
+    } catch (error) {
+      console.error('获取文件信息失败:', error);
+      setSelectedFile(file);
+    }
+  }, []);
+
   // 上传文件
   const handleUpload = useCallback(async (file: File) => {
     try {
       setLoading(true);
       const response = await dataApi.uploadFile(file);
       if (response.success) {
-        // 刷新文件列表
-        const fileList = await dataApi.getFiles();
-        setFiles(fileList);
-        
-        // 获取文件信息并选中
+        // 获取完整文件信息（包含 preview）
         const fileInfo = await dataApi.getFileInfo(response.file_id);
-        setSelectedFile({ ...response, ...fileInfo });
+        
+        // 更新文件列表：合并基本信息 + 完整信息（含 preview）
+        const newFile = { ...response, ...fileInfo };
+        setFiles(prev => [newFile, ...prev]);
+        
+        // 选中新上传的文件
+        setSelectedFile(newFile);
       }
     } catch (error) {
       console.error('上传失败:', error);
@@ -210,7 +227,7 @@ const App: React.FC = () => {
               files={files}
               selectedFile={selectedFile}
               onUpload={handleUpload}
-              onSelect={setSelectedFile}
+              onSelect={handleSelectFile}
               loading={loading}
             />
           </div>

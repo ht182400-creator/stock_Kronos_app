@@ -22,7 +22,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 // 创建 Axios 实例
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // 60秒超时（预测可能较慢）
+  timeout: 300000, // 5分钟超时（模型加载可能较慢）
   headers: {
     'Content-Type': 'application/json',
   },
@@ -125,11 +125,17 @@ export const dataApi = {
   },
 
   /**
-   * 获取文件信息
+   * 获取文件信息（支持分页）
    */
-  async getFileInfo(fileId: string): Promise<DataFileInfo & { preview?: any }> {
+  async getFileInfo(
+    fileId: string,
+    page: number = 1,
+    pageSize: number = 5
+  ): Promise<DataFileInfo & { preview?: any; pagination?: any }> {
     try {
-      const response = await apiClient.get(`/api/data/${fileId}`);
+      const response = await apiClient.get(`/api/data/${fileId}`, {
+        params: { page, page_size: pageSize },
+      });
       return response.data;
     } catch (error) {
       handleError(error);
@@ -183,8 +189,19 @@ export const predictApi = {
    */
   async getTaskResult(taskId: string): Promise<TaskResult> {
     try {
-      const response = await apiClient.get<TaskResult>(`/api/predict/${taskId}`);
-      return response.data;
+      const response = await apiClient.get<{
+        success: boolean;
+        task_id: string;
+        status: string;
+        progress?: number;
+        result?: TaskResult['result'];
+        error?: string;
+        execution_time?: number;
+      }>(`/api/predict/${taskId}`);
+      const data = response.data;
+      // 移除 success 字段，只返回 TaskResult 需要的字段
+      const { success, ...result } = data;
+      return result as TaskResult;
     } catch (error) {
       handleError(error);
     }

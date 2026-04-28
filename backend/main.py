@@ -3,7 +3,15 @@ Kronos 金融预测 Web 应用 - FastAPI 主入口
 """
 
 import sys
+import logging
 from pathlib import Path
+
+# 配置日志格式：显示日期时间到秒
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 # 添加 Kronos 源码路径
 from config import settings
@@ -115,4 +123,35 @@ if __name__ == "__main__":
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,
+        log_config={
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": {
+                    "format": "%(asctime)s [%(levelname)s] %(message)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S",
+                },
+                "access": {
+                    "format": "%(asctime)s [ACCESS] %(client_addr)s - \"%(method)s %(path)s\" %(status_code)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S",
+                },
+            },
+            "handlers": {
+                "default": {
+                    "formatter": "default",
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stderr",
+                },
+                "access": {
+                    "formatter": "access",
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stdout",
+                },
+            },
+            "loggers": {
+                "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+                "uvicorn.error": {"level": "INFO"},
+                "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+            },
+        },
     )

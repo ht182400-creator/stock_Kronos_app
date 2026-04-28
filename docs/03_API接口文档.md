@@ -96,26 +96,26 @@
 **请求体**:
 ```json
 {
-  "model_key": "kronos-small",
+  "model_key": "kronos-mini",
   "device": "cpu"
 }
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| model_key | string | 否 | 模型标识，默认 "kronos-small" |
+| model_key | string | 否 | 模型标识，默认 "kronos-mini" |
 | device | string | 否 | 设备，"cpu" 或 "cuda:0"，默认 "cpu" |
 
 **响应示例**:
 ```json
 {
   "success": true,
-  "message": "模型 Kronos-small 加载成功",
+  "message": "模型 Kronos-mini 加载成功",
   "model_info": {
-    "key": "kronos-small",
-    "name": "Kronos-small",
-    "params": "24.7M",
-    "context_length": 512
+    "key": "kronos-mini",
+    "name": "Kronos-mini",
+    "params": "4.1M",
+    "context_length": 2048
   }
 }
 ```
@@ -131,7 +131,7 @@
 {
   "success": true,
   "loaded": true,
-  "current_model": "kronos-small",
+  "current_model": "kronos-mini",
   "device": "cpu"
 }
 ```
@@ -237,7 +237,7 @@ timestamps,open,high,low,close,volume,amount
 
 **POST** `/api/predict`
 
-执行同步预测（适合小数据量，CPU 推理约 10-30 秒）。
+执行同步预测（适合小数据量，CPU 推理约 5-15 秒，使用 Kronos-mini 更快速）。
 
 **请求体**:
 ```json
@@ -257,8 +257,8 @@ timestamps,open,high,low,close,volume,amount
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | file_id | string | 是 | - | 文件 ID |
-| params.lookback | integer | 否 | 400 | 回看窗口 (100-512) |
-| params.pred_len | integer | 否 | 120 | 预测长度 (1-256) |
+| params.lookback | integer | 否 | 400 | 回看窗口 (100-2048) |
+| params.pred_len | integer | 否 | 120 | 预测长度 (1-512) |
 | params.temperature | float | 否 | 0.8 | 采样温度 (0.1-1.0) |
 | params.top_p | float | 否 | 0.9 | Nucleus 采样 (0.5-1.0) |
 | params.sample_count | integer | 否 | 1 | 采样路径数 (1-10) |
@@ -395,7 +395,7 @@ BASE_URL = "http://localhost:8000"
 
 # 1. 加载模型
 requests.post(f"{BASE_URL}/api/models/load", json={
-    "model_key": "kronos-small",
+    "model_key": "kronos-mini",
     "device": "cpu"
 })
 
@@ -442,7 +442,7 @@ const BASE_URL = "http://localhost:8000";
 await fetch(`${BASE_URL}/api/models/load`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ model_key: "kronos-small", device: "cpu" })
+  body: JSON.stringify({ model_key: "kronos-mini", device: "cpu" })
 });
 
 // 2. 上传文件

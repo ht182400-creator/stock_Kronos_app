@@ -2,7 +2,7 @@
 Kronos 金融预测 Web 应用 - 预测路由
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from routers.data import get_file_dataframe, get_file_path
 from services.prediction_service import prediction_service
@@ -100,7 +100,7 @@ async def predict_sync(request: PredictionRequest):
 
 
 @router.post("/async", response_model=AsyncPredictResponse)
-async def predict_async(request: PredictionRequest):
+async def predict_async(request: PredictionRequest, background_tasks: BackgroundTasks):
     """
     异步预测接口（推荐使用）
     
@@ -108,6 +108,7 @@ async def predict_async(request: PredictionRequest):
     
     Args:
         request: 预测请求
+        background_tasks: FastAPI 后台任务
     
     Returns:
         任务ID
@@ -161,11 +162,24 @@ async def predict_async(request: PredictionRequest):
     if not result.get("success"):
         raise HTTPException(status_code=503, detail=result.get("error"))
     
+    task_id = result["task_id"]
+    
+    # 使用 BackgroundTasks 执行预测
+    async def run_prediction():
+        print(f"[BACKGROUND] 开始执行任务 {task_id}")
+        try:
+            await prediction_service._execute_task(prediction_service._tasks[task_id])
+            print(f"[BACKGROUND] 任务 {task_id} 执行完成")
+        except Exception as e:
+            print(f"[BACKGROUND] 任务 {task_id} 执行失败: {e}")
+    
+    background_tasks.add_task(run_prediction)
+    
     return {
         "success": True,
         "message": "任务已提交",
-        "task_id": result["task_id"],
-        "status": result["status"],
+        "task_id": task_id,
+        "status": "pending",
     }
 
 

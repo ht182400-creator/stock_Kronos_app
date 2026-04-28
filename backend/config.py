@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     ]
     
     # 模型配置
-    MODEL_DEFAULT: str = "kronos-small"
+    MODEL_DEFAULT: str = "kronos-mini"
     DEVICE: str = "cpu"  # cpu, cuda:0, mps
     KRONOS_REPO_DIR: Path = Path("D:/Work_Area/Kronos")  # 本地 Kronos 源码路径
     
@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     # 预测配置
     DEFAULT_LOOKBACK: int = 400
     DEFAULT_PRED_LEN: int = 120
-    MAX_LOOKBACK: int = 512
-    MAX_PRED_LEN: int = 256
+    MAX_LOOKBACK: int = 2048  # Kronos-mini 支持最大 2048
+    MAX_PRED_LEN: int = 512   # Kronos-mini 支持最大 512
     
     # 任务队列配置
     MAX_QUEUE_SIZE: int = 10
@@ -63,6 +63,8 @@ settings = Settings()
 
 
 # 可用模型配置
+# 方式1: 从 HuggingFace 在线加载 (model_id/tokeinizer_id)
+# 方式2: 从本地加载 (local_model_path/local_tokenizer_path)
 AVAILABLE_MODELS = {
     "kronos-mini": {
         "name": "Kronos-mini",
@@ -71,6 +73,9 @@ AVAILABLE_MODELS = {
         "context_length": 2048,
         "params": "4.1M",
         "description": "轻量级模型，适合快速预测，CPU 推理首选",
+        # 本地模型路径 (已下载):
+        "local_model_path": "D:/Work_Area/AI/stock_Kronos_app/model/Kronos-min",
+        "local_tokenizer_path": "D:/Work_Area/AI/stock_Kronos_app/model/Kronos-Tokenizer-2k",
     },
     "kronos-small": {
         "name": "Kronos-small",
@@ -79,6 +84,9 @@ AVAILABLE_MODELS = {
         "context_length": 512,
         "params": "24.7M",
         "description": "平衡型模型，性能与速度兼顾",
+        # 本地路径示例:
+        # "local_model_path": "D:/models/kronos-small",
+        # "local_tokenizer_path": "D:/models/Kronos-Tokenizer-base",
     },
     "kronos-base": {
         "name": "Kronos-base",
@@ -87,5 +95,8 @@ AVAILABLE_MODELS = {
         "context_length": 512,
         "params": "102.3M",
         "description": "高质量模型，需要较强算力",
+        # 本地路径示例:
+        # "local_model_path": "D:/models/kronos-base",
+        # "local_tokenizer_path": "D:/models/Kronos-Tokenizer-base",
     },
 }

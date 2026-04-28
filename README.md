@@ -6,7 +6,7 @@
 
 - **后端**：FastAPI + Python
 - **前端**：React + TypeScript + ECharts
-- **模型**：Kronos-small (CPU 推理优化)
+- **模型**：Kronos-mini (CPU 推理优化，4.1M 参数)
 
 ## 快速启动
 

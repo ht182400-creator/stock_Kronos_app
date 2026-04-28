@@ -48,7 +48,7 @@ class LoadModelRequest(BaseModel):
 
 class LoadModelResponse(BaseResponse):
     """加载模型响应"""
-    model_info: ModelInfo
+    model_info: Optional[ModelInfo] = None
 
 
 class ModelStatusResponse(BaseResponse):
@@ -56,6 +56,13 @@ class ModelStatusResponse(BaseResponse):
     loaded: bool
     current_model: Optional[str] = None
     device: Optional[str] = None
+
+
+class ModelListResponse(BaseModel):
+    """模型列表响应"""
+    success: bool = True
+    message: str = "操作成功"
+    models: list = []
 
 
 # ============ 数据相关模型 ============

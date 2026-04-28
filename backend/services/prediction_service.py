@@ -122,7 +122,12 @@ class PredictionService:
         
         # 启动处理（如果尚未运行）
         if not self._processing:
-            asyncio.create_task(self._process_queue())
+            self._processing = True
+            task_coroutine = asyncio.ensure_future(self._process_queue())
+            print(f"[DEBUG] 已启动任务处理协程, 队列长度: {self._task_queue.qsize()}")
+            task_coroutine.add_done_callback(
+                lambda t: print(f"[DEBUG] 任务处理协程结束, 结果: {t.result()}")
+            )
         
         return {
             "success": True,
@@ -190,7 +195,7 @@ class PredictionService:
     
     async def _process_queue(self):
         """处理任务队列"""
-        self._processing = True
+        print(f"[DEBUG] _process_queue 开始运行")
         
         while True:
             try:
@@ -215,7 +220,9 @@ class PredictionService:
     
     async def _execute_task(self, task: PredictionTask):
         """执行预测任务"""
+        print(f"[DEBUG] 开始执行任务 {task.task_id}")
         task.status = "running"
+        print(f"[DEBUG] task.df columns: {list(task.df.columns)}")
         task.progress = 0
         task.updated_at = datetime.now()
         
@@ -241,6 +248,7 @@ class PredictionService:
                 x_df = time_range_df.iloc[:lookback][["open", "high", "low", "close", "volume", "amount"]]
                 x_timestamp = time_range_df.iloc[:lookback]["timestamps"]
                 y_timestamp = time_range_df.iloc[lookback:lookback + pred_len]["timestamps"]
+                x_df_full = time_range_df.iloc[:lookback]  # 完整数据（含 timestamps）
             else:
                 if len(task.df) < lookback + pred_len:
                     raise ValueError(
@@ -250,12 +258,16 @@ class PredictionService:
                 x_df = task.df.iloc[:lookback][["open", "high", "low", "close", "volume", "amount"]]
                 x_timestamp = task.df.iloc[:lookback]["timestamps"]
                 y_timestamp = task.df.iloc[lookback:lookback + pred_len]["timestamps"]
+                x_df_full = task.df.iloc[:lookback]  # 完整数据（含 timestamps）
             
             # 转换时间戳格式
             if isinstance(x_timestamp, pd.DatetimeIndex):
                 x_timestamp = pd.Series(x_timestamp.values, name="timestamps")
             if isinstance(y_timestamp, pd.DatetimeIndex):
                 y_timestamp = pd.Series(y_timestamp.values, name="timestamps")
+            
+            print(f"[DEBUG] x_df columns: {list(x_df.columns)}, x_timestamp: {x_timestamp.name}")
+            print(f"[DEBUG] 准备调用 kronos_service.predict, x_df shape: {x_df.shape}")
             
             task.progress = 30
             
@@ -270,9 +282,9 @@ class PredictionService:
             task.progress = 90
             
             if result.get("success"):
-                # 生成图表配置
+                # 生成图表配置 - 传入完整数据框（含 timestamps）
                 chart_config = self._generate_chart_config(
-                    x_df, result["predictions"], pred_len
+                    x_df_full, result["predictions"], pred_len
                 )
                 
                 task.result = {
@@ -282,12 +294,16 @@ class PredictionService:
                 }
                 task.execution_time = result.get("execution_time", 0)
                 task.status = "completed"
+                print(f"[DEBUG] 任务 {task.task_id} 执行成功!")
             else:
                 raise Exception(result.get("error", "未知错误"))
             
             task.progress = 100
         
         except Exception as e:
+            import traceback
+            print(f"[DEBUG] 任务执行异常: {e}")
+            print(f"[DEBUG] traceback: {traceback.format_exc()}")
             task.status = "failed"
             task.error = str(e)
         
