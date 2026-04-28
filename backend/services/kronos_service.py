@@ -214,52 +214,53 @@ class KronosService:
             start_time = time.time()
             
             # 在线程池中执行预测
-            pred_df = await loop.run_in_executor(
-                None,
-                self._predict_sync,
-                df,
-                x_timestamp,
-                y_timestamp,
-                params
-            )
+            try:
+                pred_df = await loop.run_in_executor(
+                    None,
+                    self._predict_sync,
+                    df,
+                    x_timestamp,
+                    y_timestamp,
+                    params
+                )
+            except Exception as e:
+                import traceback
+                print(f"[ERROR] 模型预测失败: {e}")
+                print(f"[ERROR] 详细错误: {traceback.format_exc()}")
+                raise
             
             execution_time = time.time() - start_time
             
-            # 获取历史数据统计用于合理化
-            hist_close = df["close"].values
-            hist_mean = float(hist_close.mean())
-            hist_std = float(hist_close.std())
-            
-            # 转换为预测点列表（并进行合理化处理）
+            # 转换为预测点列表
             predictions = []
             for idx, row in pred_df.iterrows():
-                pred_open = float(row.get("open", 0))
-                pred_high = float(row.get("high", 0))
-                pred_low = float(row.get("low", 0))
-                pred_close = float(row.get("close", 0))
-                pred_volume = float(row.get("volume", 0))
-                
-                # 合理化处理
-                pred_open, pred_high, pred_low, pred_close = self._sanitize_prediction(
-                    pred_open, pred_high, pred_low, pred_close, hist_mean, hist_std
-                )
+                # 安全转换为 Python float，处理 Tensor 或 numpy 类型
+                def to_float(val):
+                    if val is None:
+                        return 0.0
+                    if hasattr(val, 'item'):
+                        return float(val.item())
+                    if hasattr(val, '__float__'):
+                        return float(val)
+                    return float(val)
                 
                 predictions.append({
                     "timestamp": idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
-                    "open": pred_open,
-                    "high": pred_high,
-                    "low": pred_low,
-                    "close": pred_close,
-                    "volume": pred_volume,
+                    "open": to_float(row.get("open", 0)),
+                    "high": to_float(row.get("high", 0)),
+                    "low": to_float(row.get("low", 0)),
+                    "close": to_float(row.get("close", 0)),
+                    "volume": to_float(row.get("volume", 0)),
                 })
             
-            # 计算统计信息
-            close_values = pred_df["close"].values
+            # 计算统计信息 - 安全的计算方式
+            close_values = pred_df["close"].values.astype(float) if hasattr(pred_df["close"].values, 'astype') else pred_df["close"].values
+            close_mean = float(close_values.mean())
             statistics = {
-                "avg_close": float(close_values.mean()),
+                "avg_close": close_mean,
                 "max_close": float(close_values.max()),
                 "min_close": float(close_values.min()),
-                "volatility": float(close_values.std() / close_values.mean()) if close_values.mean() != 0 else 0,
+                "volatility": float(close_values.std() / close_mean) if close_mean != 0 else 0,
             }
             
             return {
@@ -306,84 +307,7 @@ class KronosService:
             verbose=False
         )
         
-            return pred_df
-
-    def _sanitize_prediction(
-        self,
-        open_p: float,
-        high_p: float,
-        low_p: float,
-        close_p: float,
-        hist_mean: float,
-        hist_std: float
-    ) -> tuple:
-        """
-        合理化预测结果
-        
-        Args:
-            open_p: 开盘价
-            high_p: 最高价
-            low_p: 最低价
-            close_p: 收盘价
-            hist_mean: 历史均价
-            hist_std: 历史标准差
-        
-        Returns:
-            (open, high, low, close) 修正后的值
-        """
-        import numpy as np
-        
-        # 允许的价格范围：均值 ± 3倍标准差
-        min_price = max(0.01, hist_mean - 3 * hist_std)
-        max_price = hist_mean + 3 * hist_std
-        
-        # 1. 确保所有价格非负
-        open_p = max(0.01, open_p)
-        high_p = max(0.01, high_p)
-        low_p = max(0.01, low_p)
-        close_p = max(0.01, close_p)
-        
-        # 2. 确保 high >= low
-        if high_p < low_p:
-            high_p, low_p = low_p, high_p
-        
-        # 3. 确保 open 和 close 在 [low, high] 范围内
-        open_p = np.clip(open_p, low_p, high_p)
-        close_p = np.clip(close_p, low_p, high_p)
-        
-        # 4. 确保价格在合理范围内
-        if open_p < min_price:
-            open_p = min_price
-        if open_p > max_price:
-            open_p = max_price
-            
-        if close_p < min_price:
-            close_p = min_price
-        if close_p > max_price:
-            close_p = max_price
-            
-        if high_p < min_price:
-            high_p = min_price
-        if high_p > max_price:
-            high_p = max_price
-            
-        if low_p < min_price:
-            low_p = min_price
-        if low_p > max_price:
-            low_p = max_price
-        
-        # 5. 再次确保 high >= low
-        if high_p < low_p:
-            high_p = low_p
-        
-        # 6. 如果 high 和 low 差距太小，给一点空间
-        if high_p - low_p < hist_std * 0.1:
-            center = (high_p + low_p) / 2
-            spread = hist_std * 0.1
-            low_p = center - spread
-            high_p = center + spread
-        
-        return round(open_p, 2), round(high_p, 2), round(low_p, 2), round(close_p, 2)
+        return pred_df
 
 
 # 全局服务实例
